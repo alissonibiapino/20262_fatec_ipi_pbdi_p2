@@ -28,3 +28,8 @@ O S3 usa um Gateway Endpoint, ele adiciona uma rota na tabela de rotas da VPC pa
 O STS e o AWS Secrets Manager não suportam endpoints de gateway e exigem Interface Endpoints, a AWS cria placas de rede com IPs privados dentro da sub-rede para que o job do Glue consiga alcançar esses serviços externos de forma privada.
 
 Se o DNS privado desligar, os endereços públicos desses serviços resolverão para seus IPs públicos em vez dos IPs privados das ENIs, fazendo o job falhar por timeout por não ter rota de saída para a internet.
+
+### Enunciado 7
+- **row id = bigint:** Todos os valores da coluna são números inteiros sem caracteres especiais, o crawler entendeu o tipo inteiro padrão de 64 bits.
+- **postal code = bigint:** Mesma coisa do row id, o código postal do CSV só tem números, o crawler entendeu o tipo inteiro padrão de 64 bits.
+- **sales = double:** Os valores de venda são números decimais com ponto separador, então o crawler entendeu que tinha que colocar um tipo de ponto flutuante, como o double.
