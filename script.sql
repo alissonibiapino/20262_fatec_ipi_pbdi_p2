@@ -305,3 +305,59 @@ SELECT 'fact_sales', COUNT(*) FROM dw.fact_sales;
 -- dim_location = 628
 -- dim_ship_mode = 4
 -- fact_sales = 9800
+
+
+-- enunciado 15
+DROP TABLE IF EXISTS dw.carga_log;
+CREATE TABLE dw.carga_log (
+  log_id SERIAL PRIMARY KEY,
+  sale_sk INTEGER,
+  row_nk INTEGER,
+  operacao VARCHAR(10),
+  usuario VARCHAR(60),
+  momento TIMESTAMP
+);
+
+CREATE OR REPLACE FUNCTION dw.audita_fact_sales()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.sales <= 0 THEN
+    RAISE EXCEPTION 'Venda % (row_nk %) rejeitada: valor invalido (%)',
+      NEW.sale_sk, NEW.row_nk, NEW.sales;
+  END IF;
+
+  IF NEW.ship_days < 0 THEN
+    RAISE EXCEPTION 'Venda % (row_nk %) rejeitada: ship_days negativo (%)',
+      NEW.sale_sk, NEW.row_nk, NEW.ship_days;
+  END IF;
+
+  INSERT INTO dw.carga_log (sale_sk, row_nk, operacao, usuario, momento)
+  VALUES (NEW.sale_sk, NEW.row_nk, TG_OP, CURRENT_USER, NOW());
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_audita_fact_sales ON dw.fact_sales;
+CREATE TRIGGER trg_audita_fact_sales
+BEFORE INSERT ON dw.fact_sales
+FOR EACH ROW
+EXECUTE FUNCTION dw.audita_fact_sales();
+
+INSERT INTO dw.fact_sales (row_nk, order_nk, order_date_sk, ship_date_sk,
+  customer_sk, product_sk, location_sk, ship_mode_sk, sales, ship_days)
+VALUES (999999, 'TESTE-0001', 20170101, 20170104, 1, 1, 1, 1, 100.00, 3);
+
+SELECT * FROM dw.carga_log;
+
+TRUNCATE TABLE dw.carga_log RESTART IDENTITY;
+CALL dw.carrega_dw();
+
+SELECT
+  (SELECT COUNT(*) FROM dw.carga_log) AS linhas_log,
+  (SELECT COUNT(*) FROM dw.fact_sales) AS linhas_fato;
+
+-- linhas_log = 9800
+-- linhas_fato = 9800
