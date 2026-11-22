@@ -21,3 +21,10 @@
 ### Enunciado 4
 - **REGRA 1 Type:** Libera a porta do Postgre (5432) para as conexões que vem da internet. Sem essa regra, o comand psql travaria e não funcionaria.
 - **REGRA 2 Source:** O firewall do Glue bloqueia tudo por padrão, mesmo se tiver no mesmo grupo que ele, essa regra permite que tem pertence ao grupo pode falar com ele, por causa disso o Source é o próprio grupo. Sem essa regra o JDBC vai dar timeout, pois seria barrado pelo Glue.
+
+### Enunciado 6
+O S3 usa um Gateway Endpoint, ele adiciona uma rota na tabela de rotas da VPC para enviar o tráfego internamente pela rede da AWS sem passar pela internet.
+
+O STS e o AWS Secrets Manager não suportam endpoints de gateway e exigem Interface Endpoints, a AWS cria placas de rede com IPs privados dentro da sub-rede para que o job do Glue consiga alcançar esses serviços externos de forma privada.
+
+Se o DNS privado desligar, os endereços públicos desses serviços resolverão para seus IPs públicos em vez dos IPs privados das ENIs, fazendo o job falhar por timeout por não ter rota de saída para a internet.
