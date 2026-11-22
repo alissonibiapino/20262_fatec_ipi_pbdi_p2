@@ -33,3 +33,6 @@ Se o DNS privado desligar, os endereços públicos desses serviços resolverão 
 - **row id = bigint:** Todos os valores da coluna são números inteiros sem caracteres especiais, o crawler entendeu o tipo inteiro padrão de 64 bits.
 - **postal code = bigint:** Mesma coisa do row id, o código postal do CSV só tem números, o crawler entendeu o tipo inteiro padrão de 64 bits.
 - **sales = double:** Os valores de venda são números decimais com ponto separador, então o crawler entendeu que tinha que colocar um tipo de ponto flutuante, como o double.
+
+### Enunciado 11
+O fim do calendario usa a data de envio porque o envio só acontece depois do pedido.

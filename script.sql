@@ -3,8 +3,7 @@
 CREATE SCHEMA IF NOT EXISTS staging;
 CREATE SCHEMA IF NOT EXISTS dw;
 
-DROP TABLE IF EXISTS staging.sales CASCADE;
-CREATE TABLE staging.sales (
+CREATE TABLE IF NOT EXISTS staging.sales (
     row_id        INTEGER       NOT NULL PRIMARY KEY,
     order_id      VARCHAR(20)   NOT NULL,
     order_date    DATE          NOT NULL,
@@ -27,26 +26,27 @@ CREATE TABLE staging.sales (
 
 
 -- enunciado 9
-SELECT
-    cast(trim(row_id) AS int) AS row_id,
-    trim(order_id) AS order_id,
-    to_date(trim(order_date), 'dd/MM/yyyy') AS order_date,
-    to_date(trim(ship_date),  'dd/MM/yyyy') AS ship_date,
-    trim(ship_mode) AS ship_mode,
-    trim(customer_id) AS customer_id,
-    trim(customer_name) AS customer_name,
-    trim(segment) AS segment,
-    trim(country) AS country,
-    trim(city) AS city,
-    trim(state) AS state,
-    coalesce(nullif(trim(postal_code), ''), 'N/D') AS postal_code,
-    trim(region) AS region,
-    trim(product_id) AS product_id,
-    trim(category) AS category,
-    trim(sub_category) AS sub_category,
-    trim(product_name) AS product_name,
-    cast(trim(sales) AS decimal(12,2)) AS sales
-FROM myDataSource;
+-- SELECT
+--     cast(trim(row_id) AS int) AS row_id,
+--     trim(order_id) AS order_id,
+--     to_date(trim(order_date), 'dd/MM/yyyy') AS order_date,
+--     to_date(trim(ship_date),  'dd/MM/yyyy') AS ship_date,
+--     trim(ship_mode) AS ship_mode,
+--     trim(customer_id) AS customer_id,
+--     trim(customer_name) AS customer_name,
+--     trim(segment) AS segment,
+--     trim(country) AS country,
+--     trim(city) AS city,
+--     trim(state) AS state,
+--     coalesce(nullif(trim(postal_code), ''), 'N/D') AS postal_code,
+--     trim(region) AS region,
+--     trim(product_id) AS product_id,
+--     trim(category) AS category,
+--     trim(sub_category) AS sub_category,
+--     trim(product_name) AS product_name,
+--     cast(trim(sales) AS decimal(12,2)) AS sales
+-- FROM myDataSource;
+-- professor, esse da erro quando executa tudo de uma vez, então comentei
 
 -- enunciado 10
 SELECT
@@ -188,27 +188,6 @@ CREATE INDEX ix_fs_location ON dw.fact_sales(location_sk);
 CREATE INDEX ix_fs_ship_mode ON dw.fact_sales(ship_mode_sk);
 
 -- enunciado 14
--- Enunciado 14
--- Crie a procedure dw.carrega_dw(), nos moldes da Secao 13 da apostila.
--- a) esvazia a fato e as quatro dimensoes da Fase 6, reiniciando as
---    sequencias; a dw.dim_date nao e esvaziada;
--- b) carrega cada dimensao com exatamente uma linha por chave natural;
---    quando o Enunciado 12 mostrar mais de um valor de atributo para a
---    mesma chave, usa o menor valor, em ordem alfabetica, e explica
---    essa escolha em comentario;
--- c) carrega a fato trocando os atributos naturais pelas surrogate keys
---    por JOIN; as duas chaves de data sao obtidas por formatacao das
---    datas, sem JOIN com a dw.dim_date; ship_days e a diferenca, em
---    dias, entre a data de envio e a do pedido, por subtracao de datas;
--- d) apos cada carga, obtem a quantidade de linhas inseridas com
---    GET DIAGNOSTICS e a informa com RAISE NOTICE;
--- e) ao final, compara a quantidade de linhas da fato com a da staging
---    e, se forem diferentes, interrompe a carga com RAISE EXCEPTION,
---    informando as duas quantidades.
--- Em seguida, chame a procedure e confira, em uma unica consulta com
--- UNION ALL, a quantidade de linhas das quatro dimensoes e da fato.
--- Registre os numeros em comentario.
-
 CREATE OR REPLACE PROCEDURE dw.carrega_dw()
 LANGUAGE plpgsql
 AS $$
@@ -361,3 +340,96 @@ SELECT
 
 -- linhas_log = 9800
 -- linhas_fato = 9800
+
+
+-- enunciado 16
+SELECT
+  l.region,
+  p.category,
+  COUNT(DISTINCT f.order_nk) AS pedidos,
+  COUNT(*) AS itens,
+  SUM(f.sales) AS receita
+FROM dw.fact_sales f
+JOIN dw.dim_location l ON l.location_sk = f.location_sk
+JOIN dw.dim_product p ON p.product_sk = f.product_sk
+GROUP BY l.region, p.category
+ORDER BY receita DESC;
+
+--  region  |    category     | pedidos | itens |  receita  
+-- ---------+-----------------+---------+-------+-----------
+--  East    | Technology      |     436 |   527 | 263116.59
+--  West    | Technology      |     483 |   589 | 247404.95
+--  West    | Furniture       |     582 |   691 | 245348.36
+--  West    | Office Supplies |    1150 |  1860 | 217466.46
+--  East    | Furniture       |     480 |   591 | 206461.36
+--  East    | Office Supplies |    1048 |  1667 | 199940.90
+--  Central | Technology      |     348 |   408 | 168739.19
+--  Central | Office Supplies |     865 |  1399 | 163590.15
+--  Central | Furniture       |     393 |   470 | 160317.56
+--  South   | Technology      |     252 |   289 | 148195.21
+--  South   | Office Supplies |     613 |   983 | 124424.77
+--  South   | Furniture       |     272 |   326 | 116531.47
+
+-- enunciado 17
+SELECT
+  m.ship_mode,
+  COUNT(*) AS itens,
+  ROUND(AVG(f.ship_days), 1) AS media_ship_days,
+  MIN(f.ship_days) AS menor_ship_days,
+  MAX(f.ship_days) AS maior_ship_days
+FROM dw.fact_sales f
+JOIN dw.dim_ship_mode m ON m.ship_mode_sk = f.ship_mode_sk
+GROUP BY m.ship_mode
+ORDER BY media_ship_days;
+
+--    ship_mode    | itens | media_ship_days | menor_ship_days | maior_ship_days 
+-- ----------------+-------+-----------------+-----------------+-----------------
+--  Same Day       |   538 |             0.0 |               0 |               1
+--  First Class    |  1501 |             2.2 |               1 |               4
+--  Second Class   |  1902 |             3.2 |               1 |               5
+--  Standard Class |  5859 |             5.0 |               3 |               7
+
+-- enunciado 18
+SELECT
+  c.customer_name,
+  c.segment,
+  SUM(f.sales) AS receita,
+  ROUND(100.0 * SUM(f.sales) / SUM(SUM(f.sales)) OVER (), 2) AS perc_receita
+FROM dw.fact_sales f
+JOIN dw.dim_customer c ON c.customer_sk = f.customer_sk
+GROUP BY c.customer_sk, c.customer_name, c.segment
+ORDER BY receita DESC
+LIMIT 10;
+
+--    customer_name    |   segment   | receita  | perc_receita 
+-- --------------------+-------------+----------+--------------
+--  Sean Miller        | Home Office | 25043.07 |         1.11
+--  Tamara Chand       | Corporate   | 19052.22 |         0.84
+--  Raymond Buch       | Consumer    | 15117.35 |         0.67
+--  Tom Ashbrook       | Home Office | 14595.62 |         0.65
+--  Adrian Barton      | Consumer    | 14473.57 |         0.64
+--  Ken Lonsdale       | Consumer    | 14175.23 |         0.63
+--  Sanjit Chand       | Consumer    | 14142.34 |         0.63
+--  Hunter Lopez       | Consumer    | 12873.30 |         0.57
+--  Sanjit Engle       | Consumer    | 12209.44 |         0.54
+--  Christopher Conant | Consumer    | 12129.08 |         0.54
+
+-- enunciado 19
+SELECT
+  od.year AS ano_pedido,
+  COUNT(*) AS itens,
+  SUM(f.sales) AS receita,
+  COUNT(*) FILTER (WHERE sd.is_weekend) AS enviados_fim_de_semana
+FROM dw.fact_sales f
+JOIN dw.dim_date od ON od.date_sk = f.order_date_sk
+JOIN dw.dim_date sd ON sd.date_sk = f.ship_date_sk
+GROUP BY od.year
+ORDER BY od.year;
+
+--  ano_pedido | itens |  receita  | enviados_fim_de_semana 
+-- ------------+-------+-----------+------------------------
+--        2015 |  1953 | 479856.27 |                    632
+--        2016 |  2055 | 459435.94 |                    661
+--        2017 |  2534 | 600192.80 |                    812
+--        2018 |  3258 | 722051.96 |                    867
+
